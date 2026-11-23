@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App background. Replace with your own image: delete this file and drop
+     app_background.png / .jpg into res/drawable-nodpi/. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="1080dp"
+    android:height="2400dp"
+    android:viewportWidth="1080"
+    android:viewportHeight="2400">
+    <path android:pathData="M0,0h1080v2400h-1080z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="400" android:endY="2400">
+                <item android:offset="0" android:color="#FF0C1A36" />
+                <item android:offset="0.45" android:color="#FF08111F" />
+                <item android:offset="1" android:color="#FF050912" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M0,0h1080v2400h-1080z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="980" android:centerY="160" android:gradientRadius="900">
+                <item android:offset="0" android:color="#552D7FF9" />
+                <item android:offset="1" android:color="#002D7FF9" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M-60,1880 C200,1760 420,1990 700,1860 C880,1780 1000,1800 1140,1740"
+        android:strokeWidth="3" android:strokeColor="#3322D3EE" android:fillColor="#00000000" />
+    <path
+        android:pathData="M-60,1960 C220,1840 460,2070 720,1940 C900,1850 1020,1880 1140,1820"
+        android:strokeWidth="2" android:strokeColor="#262D7FF9" android:fillColor="#00000000" />
+    <path
+        android:pathData="M-60,2040 C240,1930 480,2150 740,2020 C920,1930 1040,1960 1140,1900"
+        android:strokeWidth="2" android:strokeColor="#1A22D3EE" android:fillColor="#00000000" />
+    <path
+        android:pathData="M-60,520 C180,430 380,610 640,500 C820,420 980,460 1140,380"
+        android:strokeWidth="2" android:strokeColor="#142D7FF9" android:fillColor="#00000000" />
+</vector>
