@@ -93,7 +93,9 @@ class SrtReceiver(private val config: StreamConfig) {
                 socket.setSockFlag(SockOpt.REUSEADDR, true)
                 socket.bind("0.0.0.0", config.port)
                 socket.listen(1)
-                val (client, address) = socket.accept()
+                val accepted = socket.accept()
+                val client: SrtSocket = accepted.first
+                val address: java.net.InetSocketAddress? = accepted.second
                 listenSocket = null
                 closeQuietly(socket)
                 if (!running) {
@@ -102,7 +104,7 @@ class SrtReceiver(private val config: StreamConfig) {
                 }
                 dataSocket = client
                 connected = client
-                peer = address?.let { "${it.address?.hostAddress ?: it.hostString}:${it.port}" } ?: "remote caller"
+                peer = address?.let { a -> "${a.address?.hostAddress ?: a.hostString}:${a.port}" } ?: "remote caller"
             }
             // Wake up regularly so a silent stream / stop() is noticed.
             connected.setSockFlag(SockOpt.RCVTIMEO, 1000)
