@@ -5,6 +5,7 @@ import com.gabriel.srtmonitor.model.SrtMode
 import com.gabriel.srtmonitor.model.StreamConfig
 import io.github.thibaultbee.srtdroid.core.enums.ErrorType
 import io.github.thibaultbee.srtdroid.core.enums.SockOpt
+import io.github.thibaultbee.srtdroid.core.enums.SockStatus
 import io.github.thibaultbee.srtdroid.core.enums.Transtype
 import io.github.thibaultbee.srtdroid.core.models.SrtError
 import io.github.thibaultbee.srtdroid.core.models.SrtSocket
@@ -89,7 +90,7 @@ class SrtReceiver(private val config: StreamConfig) {
                 dataSocket = socket
                 Log.i(TAG, "Calling ${config.host.trim()}:${config.port} latency=${config.latencyMs} " +
                     "encrypted=${config.passphrase.isNotEmpty()} streamId='${config.streamId}' timeout=${config.connectTimeoutSec}s")
-                socket.connect(config.host.trim(), config.port)
+                connectNonBlocking(socket)
                 connected = socket
                 peer = "${config.host.trim()}:${config.port}"
             } else {
@@ -138,6 +139,8 @@ class SrtReceiver(private val config: StreamConfig) {
                     queue.offer(chunk)
                 }
             }
+        } catch (e: ConnectFailure) {
+            if (running) fail(e.message ?: "Connection failed")
         } catch (e: InterruptedIOException) {
             if (running) fail("Connection closed by remote")
         } catch (t: Throwable) {
@@ -146,6 +149,60 @@ class SrtReceiver(private val config: StreamConfig) {
             closeQuietly(listenSocket)
             closeQuietly(dataSocket)
         }
+    }
+
+    private class ConnectFailure(message: String) : Exception(message)
+
+    /**
+     * Connects the way VLC and ffmpeg do (non-blocking + poll). libsrt's blocking connect adds an
+     * extra ISN "security check" that some listeners (e.g. Nevion Virtuoso) don't satisfy, which
+     * aborts an otherwise good connection with SRT_ESECFAIL.
+     */
+    private fun connectNonBlocking(s: SrtSocket) {
+        s.setSockFlag(SockOpt.RCVSYN, false)
+        s.connect(config.host.trim(), config.port)
+        val deadline = System.currentTimeMillis() + config.connectTimeoutSec * 1000L + 1000L
+        while (running) {
+            when (s.sockState) {
+                SockStatus.CONNECTED -> {
+                    s.setSockFlag(SockOpt.RCVSYN, true) // back to blocking reads
+                    return
+                }
+                SockStatus.BROKEN, SockStatus.CLOSED, SockStatus.CLOSING, SockStatus.NONEXIST -> {
+                    throw ConnectFailure(rejectText(s))
+                }
+                else -> Unit
+            }
+            // A failed non-blocking connect stays CONNECTING; the reject reason tells us it failed.
+            val rejected = runCatching { s.rejectReason }.getOrNull()
+            val rejectedCode = (rejected as? InternalRejectReason)?.code?.name
+            if (rejected != null && rejectedCode != "UNKNOWN") throw ConnectFailure(rejectText(s))
+            if (System.currentTimeMillis() > deadline) {
+                throw ConnectFailure("No answer from ${config.host}:${config.port} (is the source in Listener mode?)")
+            }
+            Thread.sleep(20)
+        }
+    }
+
+    private fun rejectText(s: SrtSocket): String {
+        val r = runCatching { s.rejectReason }.getOrNull()
+        val code = (r as? InternalRejectReason)?.code?.name
+        val friendly = when (code) {
+            "TIMEOUT" -> "No answer from ${config.host}:${config.port} (is the source in Listener mode?)"
+            "BADSECRET" -> "Wrong passphrase"
+            "UNSECURE" -> "The source requires a passphrase (Advanced tab)"
+            "PEER" -> "Connection refused by the source"
+            "BACKLOG" -> "The source is busy (already serving another caller?)"
+            "VERSION" -> "SRT version not accepted by the source"
+            else -> "Connection failed"
+        }
+        val detail = when (r) {
+            is InternalRejectReason -> "reject: ${r.code.name}"
+            is PredefinedRejectReason -> "reject: code ${r.code}"
+            is UserDefinedRejectReason -> "reject: code ${r.code}"
+            else -> null
+        }
+        return if (detail == null) friendly else "$friendly\n[$detail]"
     }
 
     private fun configure(s: SrtSocket) {
