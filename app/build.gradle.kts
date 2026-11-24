@@ -71,13 +71,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     // Video: Media3 (ExoPlayer) MPEG-TS demux + hardware H.264 / H.265 decode
-    val media3 = "1.10.1"
+    val media3 = "1.11.1"
     implementation("androidx.media3:media3-exoplayer:$media3")
     implementation("androidx.media3:media3-extractor:$media3")
     implementation("androidx.media3:media3-datasource:$media3")
 
     // Software (FFmpeg) H.264 / HEVC decoders for formats the phone hardware can't decode (4:2:2, etc.)
-    implementation("io.github.anilbeesetti:nextlib-media3ext:$media3-0.13.0")
+    implementation("io.github.anilbeesetti:nextlib-media3ext:$media3-0.19.0")
 
     // SRT: libsrt (+ OpenSSL for AES) packaged for Android
     implementation("io.github.thibaultbee.srtdroid:srtdroid-core:1.9.5")
