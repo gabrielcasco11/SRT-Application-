@@ -161,11 +161,59 @@ fun PlayerScreen(config: StreamConfig, app: SrtApp, onBack: () -> Unit) {
         }
     }
 
+    var showLog by remember { mutableStateOf(false) }
+
     if (landscape) {
         FullscreenLayout(ui, config, onExit = exitFullscreen) { video(ui, true) }
     } else {
-        PortraitLayout(ui, config, onBack = onBack, onFullscreen = enterFullscreen) { video(ui, false) }
+        PortraitLayout(ui, config, onBack = onBack, onFullscreen = enterFullscreen, onShowLog = { showLog = true }) { video(ui, false) }
     }
+    if (showLog) LogDialog(onDismiss = { showLog = false })
+}
+
+@Composable
+private fun LogDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var text by remember { mutableStateOf("Reading log…") }
+    LaunchedEffect(Unit) {
+        text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.gabriel.srtmonitor.DiagnosticsLog.read() }
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Palette.Surface,
+        title = { Text("SRT log", color = Palette.Text) },
+        text = {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(420.dp)
+                    .background(Palette.Field)
+                    .padding(8.dp),
+            ) {
+                Text(
+                    text,
+                    color = Palette.Text,
+                    fontSize = 10.sp,
+                    lineHeight = 13.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.verticalScroll(rememberScrollState(Int.MAX_VALUE)),
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_SUBJECT, "SRT Monitor log")
+                    putExtra(android.content.Intent.EXTRA_TEXT, text)
+                }
+                context.startActivity(android.content.Intent.createChooser(send, "Share log"))
+            }) { Text("SHARE", color = Palette.Accent) }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text("CLOSE", color = Palette.Muted) }
+        },
+    )
 }
 
 // ---- layouts -----------------------------------------------------------------------------------
@@ -176,6 +224,7 @@ private fun PortraitLayout(
     config: StreamConfig,
     onBack: () -> Unit,
     onFullscreen: () -> Unit,
+    onShowLog: () -> Unit,
     video: @Composable () -> Unit,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(1) }
@@ -185,6 +234,9 @@ private fun PortraitLayout(
     ) {
         Column(Modifier.widthIn(max = 640.dp).fillMaxSize()) {
             BackRow(onBack = onBack, modifier = Modifier.padding(horizontal = 12.dp)) {
+                androidx.compose.material3.TextButton(onClick = onShowLog) {
+                    Text("LOG", color = Palette.Accent, fontSize = 12.sp, letterSpacing = 1.sp)
+                }
                 PhasePill(ui.phase, Modifier.padding(end = 4.dp))
             }
             Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)) {

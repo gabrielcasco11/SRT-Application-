@@ -87,6 +87,8 @@ class SrtReceiver(private val config: StreamConfig) {
             if (config.mode == SrtMode.CALLER) {
                 _state.value = State.Connecting
                 dataSocket = socket
+                Log.i(TAG, "Calling ${config.host.trim()}:${config.port} latency=${config.latencyMs} " +
+                    "encrypted=${config.passphrase.isNotEmpty()} streamId='${config.streamId}' timeout=${config.connectTimeoutSec}s")
                 socket.connect(config.host.trim(), config.port)
                 connected = socket
                 peer = "${config.host.trim()}:${config.port}"
@@ -162,7 +164,7 @@ class SrtReceiver(private val config: StreamConfig) {
     }
 
     private fun fail(reason: String) {
-        Log.w(TAG, "SRT failed: $reason")
+        Log.w(TAG, "SRT failed: $reason | ${runCatching { SrtError.lastErrorMessage }.getOrNull()}")
         _state.value = State.Failed(reason)
     }
 
@@ -172,7 +174,7 @@ class SrtReceiver(private val config: StreamConfig) {
             ErrorType.ENOSERVER -> "No answer from ${config.host}:${config.port} (is the source in Listener mode?)"
             ErrorType.ECONNREJ -> "Connection rejected (check passphrase / stream ID / mode)"
             ErrorType.ECONNLOST -> "Connection lost"
-            ErrorType.ESECFAIL -> "Encryption mismatch: the source probably has a passphrase set (Advanced tab)"
+            ErrorType.ESECFAIL -> "The source answered, but its handshake reply didn't match this connection"
             ErrorType.ECONNSETUP -> if (config.mode == SrtMode.LISTENER) "Can't listen on port ${config.port}" else null
             else -> null
         }

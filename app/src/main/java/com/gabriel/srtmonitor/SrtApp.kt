@@ -11,6 +11,7 @@ class SrtApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Srt.startUp()
+        runCatching { Srt.setLogLevel(7) } // LOG_DEBUG: handshake details go to logcat
         wifi = WifiMonitor(this)
     }
 }
