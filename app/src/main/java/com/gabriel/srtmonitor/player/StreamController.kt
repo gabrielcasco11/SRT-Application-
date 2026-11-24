@@ -372,6 +372,11 @@ class StreamController(
                         pktRetransmitted = retransTotal,
                         measuredFps = fps ?: it.measuredFps,
                         playerBufferMs = bufferMs,
+                        message = if (s.pktRcvUndecryptTotal > 0 && it.phase == Phase.CONNECTED) {
+                            "The stream is encrypted. Enter the source's passphrase in Advanced."
+                        } else {
+                            it.message
+                        },
                     )
                 }
             } else {

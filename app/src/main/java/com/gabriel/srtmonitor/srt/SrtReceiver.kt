@@ -9,6 +9,9 @@ import io.github.thibaultbee.srtdroid.core.enums.Transtype
 import io.github.thibaultbee.srtdroid.core.models.SrtError
 import io.github.thibaultbee.srtdroid.core.models.SrtSocket
 import io.github.thibaultbee.srtdroid.core.models.Stats
+import io.github.thibaultbee.srtdroid.core.models.rejectreason.InternalRejectReason
+import io.github.thibaultbee.srtdroid.core.models.rejectreason.PredefinedRejectReason
+import io.github.thibaultbee.srtdroid.core.models.rejectreason.UserDefinedRejectReason
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -150,6 +153,10 @@ class SrtReceiver(private val config: StreamConfig) {
         if (config.passphrase.isNotEmpty()) {
             s.setSockFlag(SockOpt.PASSPHRASE, config.passphrase)
             if (config.keyLength in listOf(16, 24, 32)) s.setSockFlag(SockOpt.PBKEYLEN, config.keyLength)
+        } else {
+            // Behave like older SRT builds (e.g. VLC's): don't refuse the connection just
+            // because the other side has encryption configured.
+            runCatching { s.setSockFlag(SockOpt.ENFORCEDENCRYPTION, false) }
         }
         if (config.streamId.isNotBlank()) s.setSockFlag(SockOpt.STREAMID, config.streamId.trim())
     }
@@ -165,11 +172,22 @@ class SrtReceiver(private val config: StreamConfig) {
             ErrorType.ENOSERVER -> "No answer from ${config.host}:${config.port} (is the source in Listener mode?)"
             ErrorType.ECONNREJ -> "Connection rejected (check passphrase / stream ID / mode)"
             ErrorType.ECONNLOST -> "Connection lost"
-            ErrorType.ESECFAIL -> "Encryption handshake failed (check passphrase)"
+            ErrorType.ESECFAIL -> "Encryption mismatch: the source probably has a passphrase set (Advanced tab)"
             ErrorType.ECONNSETUP -> if (config.mode == SrtMode.LISTENER) "Can't listen on port ${config.port}" else null
             else -> null
         }
-        return friendly ?: (t.message?.takeIf { it.isNotBlank() } ?: t.javaClass.simpleName)
+        val base = friendly ?: (t.message?.takeIf { it.isNotBlank() } ?: t.javaClass.simpleName)
+        val reason = runCatching {
+            when (val r = (dataSocket ?: listenSocket)?.rejectReason) {
+                is InternalRejectReason -> r.code.name.takeIf { it != "UNKNOWN" }
+                is PredefinedRejectReason -> "code ${r.code}"
+                is UserDefinedRejectReason -> "code ${r.code}"
+                else -> null
+            }
+        }.getOrNull()
+        val code = err?.name?.let { "SRT $it" }
+        val detail = listOfNotNull(code, reason?.let { "reject: $it" }).joinToString(" · ")
+        return if (detail.isEmpty()) base else "$base\n[$detail]"
     }
 
     private fun closeQuietly(s: SrtSocket?) {

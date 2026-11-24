@@ -356,6 +356,9 @@ private fun StatusOverlay(ui: LiveUi, config: StreamConfig, phoneIp: String?) {
                     fontSize = 15.sp,
                     modifier = Modifier.padding(top = 12.dp),
                 )
+                if (ui.phase == Phase.CONNECTED && ui.message.isNotBlank()) {
+                    Text(ui.message, color = Palette.Warn, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+                }
             }
         }
     }
