@@ -18,6 +18,8 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
+import com.gabriel.srtmonitor.model.DecoderMode
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -83,6 +85,9 @@ class StreamController(
     private var statsJob: Job? = null
     private val playerError = MutableStateFlow<String?>(null)
     private var boundToWifi = false
+
+    /** True once we've decided to decode in software (FFmpeg) for this session. */
+    private var useSoftware = config.decoderMode == DecoderMode.SOFTWARE
 
     private var retransTotal = 0L
     private var lastRendered = -1
@@ -159,12 +164,20 @@ class StreamController(
                 if (receiver === rx) receiver = null
             }
             attempt++
-            delay(if (config.mode == SrtMode.LISTENER) 500L else min(1000L * attempt, 3000L))
+            val switched = _ui.value.message.startsWith("Phone hardware")
+            delay(if (switched || config.mode == SrtMode.LISTENER) 300L else min(1000L * attempt, 3000L))
         }
     }
 
     private fun startPlayer(rx: SrtReceiver) {
-        val renderers = DefaultRenderersFactory(appContext).setEnableDecoderFallback(true)
+        val mode = when {
+            useSoftware -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+            config.decoderMode == DecoderMode.HARDWARE -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
+            else -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+        }
+        val renderers = NextRenderersFactory(appContext)
+            .setExtensionRendererMode(mode)
+            .setEnableDecoderFallback(true)
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 1000,
@@ -219,6 +232,12 @@ class StreamController(
 
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
+            if (!useSoftware && config.decoderMode == DecoderMode.AUTO && isDecoderError(error)) {
+                Log.i(TAG, "Hardware decoder failed (${error.errorCodeName}); switching to FFmpeg software decoder")
+                useSoftware = true
+                playerError.value = "Phone hardware can't decode this format. Switching to software decoder…"
+                return
+            }
             val detail = error.cause?.message ?: error.message ?: ""
             Log.w(TAG, "Player error ${error.errorCodeName}: $detail", error)
             playerError.value = "Player: ${error.errorCodeName.removePrefix("ERROR_CODE_")} $detail".trim()
@@ -263,6 +282,14 @@ class StreamController(
             }
         }
     }
+
+    private fun isDecoderError(e: PlaybackException) = e.errorCode in setOf(
+        PlaybackException.ERROR_CODE_DECODING_FAILED,
+        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+        PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+    )
 
     private val analyticsListener = object : AnalyticsListener {
         override fun onVideoDecoderInitialized(

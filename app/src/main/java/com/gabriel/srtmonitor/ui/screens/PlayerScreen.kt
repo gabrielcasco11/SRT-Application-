@@ -535,7 +535,9 @@ private fun InfoTab(ui: LiveUi, config: StreamConfig) {
         listOf(
             "Codec" to Labels.videoCodec(v?.mime),
             "Profile" to Labels.profile(v?.codecs),
-            "Resolution" to (v?.takeIf { it.width > 0 }?.let { "${it.width} × ${it.height}" } ?: "—"),
+            "Resolution" to (v?.takeIf { it.width > 0 }?.let {
+                if (ui.isFieldCoded) "${it.width} × ${it.height * 2} interlaced (field-coded)" else "${it.width} × ${it.height}"
+            } ?: "—"),
             "Frame rate" to (v?.frameRate?.takeIf { it > 0 }?.let { "%.2f fps".format(it) }
                 ?: ui.measuredFps?.let { "≈ %.0f fps".format(it) } ?: "—"),
             "Decoder" to (ui.videoDecoder?.let { "$it (${if (hw == true) "hardware" else "software"})" } ?: "—"),

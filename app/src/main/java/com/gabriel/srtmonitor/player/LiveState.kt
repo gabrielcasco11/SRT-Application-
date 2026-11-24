@@ -49,7 +49,17 @@ data class LiveUi(
         get() {
             val v = video ?: return 16f / 9f
             if (v.width <= 0 || v.height <= 0) return 16f / 9f
-            return v.width * v.pixelRatio / v.height
+            val ar = v.width * v.pixelRatio / v.height
+            // Field-coded interlaced HEVC (e.g. 1080i sent as 1920x540 fields): show at full frame shape.
+            return if (isFieldCoded) ar / 2f else ar
+        }
+
+    /** 1080i/576i HEVC is often coded as separate fields, so each picture is half height. */
+    val isFieldCoded: Boolean
+        get() {
+            val v = video ?: return false
+            if (v.width <= 0 || v.height <= 0) return false
+            return v.width * v.pixelRatio / v.height > 3f
         }
 }
 
@@ -109,7 +119,8 @@ object Labels {
     fun isHardwareDecoder(name: String?): Boolean? {
         if (name == null) return null
         val n = name.lowercase()
-        return !(n.startsWith("c2.android.") || n.startsWith("omx.google.") || n.contains(".sw."))
+        return !(n.startsWith("c2.android.") || n.startsWith("c2.google.") || n.startsWith("omx.google.") ||
+            n.contains(".sw.") || n.startsWith("ffmpeg"))
     }
 
     fun bitrate(kbps: Float?): String = when {

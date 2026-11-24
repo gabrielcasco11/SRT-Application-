@@ -4,6 +4,9 @@ import android.content.Context
 
 enum class SrtMode { CALLER, LISTENER }
 
+/** AUTO = phone hardware first, FFmpeg software if the hardware can't decode the stream. */
+enum class DecoderMode { AUTO, HARDWARE, SOFTWARE }
+
 /** Everything needed to receive the one stream this app is built for. */
 data class StreamConfig(
     val name: String = "My Stream",
@@ -18,6 +21,7 @@ data class StreamConfig(
     val connectTimeoutSec: Int = 3,
     /** Keep SRT traffic on Wi-Fi even when that Wi-Fi has no internet access. */
     val routeViaWifi: Boolean = true,
+    val decoderMode: DecoderMode = DecoderMode.AUTO,
 ) {
     val isConfigured: Boolean get() = mode == SrtMode.LISTENER || host.isNotBlank()
     val encrypted: Boolean get() = passphrase.isNotEmpty()
@@ -67,6 +71,7 @@ object ConfigStore {
             streamId = p.getString("streamId", d.streamId) ?: d.streamId,
             connectTimeoutSec = p.getInt("timeout", d.connectTimeoutSec),
             routeViaWifi = p.getBoolean("routeViaWifi", d.routeViaWifi),
+            decoderMode = runCatching { DecoderMode.valueOf(p.getString("decoder", d.decoderMode.name)!!) }.getOrDefault(d.decoderMode),
         )
     }
 
@@ -82,6 +87,7 @@ object ConfigStore {
             .putString("streamId", c.streamId)
             .putInt("timeout", c.connectTimeoutSec)
             .putBoolean("routeViaWifi", c.routeViaWifi)
+            .putString("decoder", c.decoderMode.name)
             .apply()
     }
 }

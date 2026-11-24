@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gabriel.srtmonitor.model.DecoderMode
 import com.gabriel.srtmonitor.model.SrtMode
 import com.gabriel.srtmonitor.model.StreamConfig
 import com.gabriel.srtmonitor.net.WifiMonitor
@@ -76,6 +77,7 @@ fun SetupScreen(
     var streamId by rememberSaveable { mutableStateOf(initial.streamId) }
     var timeout by rememberSaveable { mutableStateOf(initial.connectTimeoutSec.toString()) }
     var routeViaWifi by rememberSaveable { mutableStateOf(initial.routeViaWifi) }
+    var decoderMode by rememberSaveable { mutableStateOf(initial.decoderMode) }
     var showPass by remember { mutableStateOf(false) }
     var errors by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var wifiWarning by remember { mutableStateOf(false) }
@@ -94,6 +96,7 @@ fun SetupScreen(
         streamId = streamId.trim(),
         connectTimeoutSec = timeout.toIntOrNull() ?: -1,
         routeViaWifi = routeViaWifi,
+        decoderMode = decoderMode,
     )
 
     fun validated(): StreamConfig? {
@@ -242,6 +245,23 @@ fun SetupScreen(
                     value = streamId,
                     onValueChange = { streamId = it.take(512) },
                     placeholder = "Optional",
+                )
+                FieldLabel("Video decoder")
+                SegmentedControl(
+                    options = listOf("Auto", "Hardware", "Software"),
+                    selected = decoderMode.ordinal,
+                    onSelect = { decoderMode = DecoderMode.entries[it] },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    when (decoderMode) {
+                        DecoderMode.AUTO -> "Uses the phone's hardware decoder, and switches to the FFmpeg software decoder automatically if the stream can't be decoded (e.g. 4:2:2)."
+                        DecoderMode.HARDWARE -> "Phone hardware only: lowest battery use, 4:2:0 streams only."
+                        DecoderMode.SOFTWARE -> "Always FFmpeg: plays 4:2:2 / 10-bit; uses more battery and gets warm."
+                    },
+                    color = Palette.Muted,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
                 LabeledField(
                     label = "Connection timeout (s)",

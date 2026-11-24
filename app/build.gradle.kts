@@ -76,6 +76,9 @@ dependencies {
     implementation("androidx.media3:media3-extractor:$media3")
     implementation("androidx.media3:media3-datasource:$media3")
 
+    // Software (FFmpeg) H.264 / HEVC decoders for formats the phone hardware can't decode (4:2:2, etc.)
+    implementation("io.github.anilbeesetti:nextlib-media3ext:$media3-0.13.0")
+
     // SRT: libsrt (+ OpenSSL for AES) packaged for Android
     implementation("io.github.thibaultbee.srtdroid:srtdroid-core:1.9.5")
 }
